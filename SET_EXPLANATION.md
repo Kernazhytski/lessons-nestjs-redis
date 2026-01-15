@@ -285,47 +285,213 @@ const uniqueIPs = await getUniqueIPs();
 console.log(uniqueIPs); // ['192.168.1.1', '192.168.1.2']
 ```
 
-## Операции над множествами (не реализованы в нашем сервисе, но доступны в Redis)
+## Дополнительные операции над множествами
 
-### Объединение множеств (SUNION)
+### 5. SCARD - Получить количество элементов в множестве
 
 ```typescript
-// В Redis (не реализовано в нашем сервисе):
-// SUNION set1 set2 → объединяет два множества
-// Пример:
+const count = await redis.scard('tags');
+// Вернет количество элементов в множестве
+```
+
+**Что происходит:**
+- Возвращает количество элементов в множестве
+- Если множество не существует, возвращает 0
+- Аналог `LLEN` для списков
+
+**Пример:**
+```typescript
+await redis.sadd('tags', 'red', 'blue', 'green');
+const count = await redis.scard('tags');
+console.log(count); // 3
+```
+
+### 6. SPOP - Получить и удалить случайный элемент
+
+```typescript
+const random = await redis.spop('tags');
+// Вернет случайный элемент и удалит его из множества
+```
+
+**Что происходит:**
+- Возвращает случайный элемент из множества
+- Элемент удаляется из множества
+- Если множество пусто, возвращает `null`
+
+**Пример:**
+```typescript
+// Множество: {'red', 'blue', 'green'}
+const random1 = await redis.spop('tags');
+console.log(random1); // Например: 'blue'
+// Множество после: {'red', 'green'}
+
+const random2 = await redis.spop('tags');
+console.log(random2); // Например: 'green'
+// Множество после: {'red'}
+```
+
+**Использование:** Лотереи, случайные выборки, очереди с случайным порядком
+
+### 7. SRANDMEMBER - Получить случайный элемент (без удаления)
+
+```typescript
+const random = await redis.srandmember('tags');
+// Вернет случайный элемент, но не удалит его
+```
+
+**Параметры:**
+- `key` - имя ключа множества
+- `count` - опционально: количество элементов (если не указано, возвращает один элемент)
+
+**Что происходит:**
+- Возвращает случайный элемент из множества
+- Элемент остается в множестве (не удаляется)
+- Если указан `count`, возвращает массив элементов
+- Если множество пусто, возвращает `null`
+
+**Примеры:**
+```typescript
+// Множество: {'red', 'blue', 'green'}
+
+// Получить один случайный элемент
+const random = await redis.srandmember('tags');
+console.log(random); // Например: 'blue'
+// Множество остается: {'red', 'blue', 'green'}
+
+// Получить несколько случайных элементов
+const randomMultiple = await redis.srandmember('tags', 2);
+console.log(randomMultiple); // Например: ['red', 'green']
+```
+
+**Использование:** Показ случайных элементов без удаления, предпросмотр
+
+### 8. SMOVE - Переместить элемент из одного множества в другое
+
+```typescript
+const moved = await redis.smove('set1', 'set2', 'element');
+// Переместит 'element' из set1 в set2
+```
+
+**Что происходит:**
+- Атомарно перемещает элемент из одного множества в другое
+- Если элемент не существует в исходном множестве, ничего не происходит
+- Если целевое множество не существует, оно создается
+- Возвращает 1, если элемент перемещен, 0 - если не найден
+
+**Пример:**
+```typescript
+// set1: {'a', 'b', 'c'}
+// set2: {'d', 'e'}
+
+const moved = await redis.smove('set1', 'set2', 'b');
+console.log(moved); // 1 (элемент перемещен)
+
+// set1 после: {'a', 'c'}
+// set2 после: {'d', 'e', 'b'}
+```
+
+**Использование:** Перемещение элементов между категориями, изменение статусов
+
+### 9. SUNION - Объединить несколько множеств
+
+```typescript
+const union = await redis.sunion('set1', 'set2', 'set3');
+// Вернет все уникальные элементы из всех множеств
+```
+
+**Что происходит:**
+- Объединяет несколько множеств
+- Возвращает все уникальные элементы из всех множеств
+- Дубликаты автоматически удаляются
+- Исходные множества не изменяются
+
+**Пример:**
+```typescript
 // set1: {'a', 'b', 'c'}
 // set2: {'c', 'd', 'e'}
-// SUNION → {'a', 'b', 'c', 'd', 'e'}
+// set3: {'e', 'f'}
+
+const union = await redis.sunion('set1', 'set2', 'set3');
+console.log(union); // ['a', 'b', 'c', 'd', 'e', 'f']
+// Исходные множества не изменились
 ```
 
-### Пересечение множеств (SINTER)
+**Визуально:**
+```
+set1: {'a', 'b', 'c'}
+set2: {'c', 'd', 'e'}
+set3: {'e', 'f'}
+
+SUNION → {'a', 'b', 'c', 'd', 'e', 'f'}
+```
+
+**Использование:** Объединение тегов, поиск по нескольким категориям
+
+### 10. SINTER - Найти пересечение множеств (общие элементы)
 
 ```typescript
-// В Redis (не реализовано в нашем сервисе):
-// SINTER set1 set2 → находит общие элементы
-// Пример:
-// set1: {'a', 'b', 'c'}
-// set2: {'b', 'c', 'd'}
-// SINTER → {'b', 'c'}
+const intersection = await redis.sinter('set1', 'set2', 'set3');
+// Вернет элементы, которые есть во всех множествах
 ```
 
-### Разность множеств (SDIFF)
+**Что происходит:**
+- Находит элементы, которые присутствуют во всех указанных множествах
+- Возвращает только общие элементы
+- Исходные множества не изменяются
+
+**Пример:**
+```typescript
+// set1: {'a', 'b', 'c', 'd'}
+// set2: {'b', 'c', 'd', 'e'}
+// set3: {'c', 'd', 'f'}
+
+const intersection = await redis.sinter('set1', 'set2', 'set3');
+console.log(intersection); // ['c', 'd'] (только общие элементы)
+```
+
+**Визуально:**
+```
+set1: {'a', 'b', 'c', 'd'}
+set2: {'b', 'c', 'd', 'e'}
+set3: {'c', 'd', 'f'}
+
+SINTER → {'c', 'd'} (только то, что есть везде)
+```
+
+**Использование:** Поиск общих интересов, фильтрация по нескольким критериям
+
+### 11. SDIFF - Найти разность множеств
 
 ```typescript
-// В Redis (не реализовано в нашем сервисе):
-// SDIFF set1 set2 → элементы из set1, которых нет в set2
-// Пример:
-// set1: {'a', 'b', 'c'}
-// set2: {'b', 'c', 'd'}
-// SDIFF → {'a'}
+const diff = await redis.sdiff('set1', 'set2', 'set3');
+// Вернет элементы из set1, которых нет в set2 и set3
 ```
 
-### Другие полезные операции
+**Что происходит:**
+- Возвращает элементы из первого множества, которых нет в остальных
+- Вычитает из первого множества все остальные
+- Исходные множества не изменяются
 
-- `SCARD` - получить количество элементов в множестве (аналог LLEN для списков)
-- `SPOP` - получить и удалить случайный элемент
-- `SRANDMEMBER` - получить случайный элемент (без удаления)
-- `SMOVE` - переместить элемент из одного множества в другое
+**Пример:**
+```typescript
+// set1: {'a', 'b', 'c', 'd'}
+// set2: {'b', 'c'}
+// set3: {'d'}
+
+const diff = await redis.sdiff('set1', 'set2', 'set3');
+console.log(diff); // ['a'] (только то, что есть в set1, но нет в set2 и set3)
+```
+
+**Визуально:**
+```
+set1: {'a', 'b', 'c', 'd'}
+set2: {'b', 'c'}
+set3: {'d'}
+
+SDIFF → {'a'} (set1 минус set2 минус set3)
+```
+
+**Использование:** Найти уникальные элементы, исключить элементы из другого множества
 
 ## Сравнение с другими структурами данных
 
@@ -420,30 +586,121 @@ const count = uniqueViews.length;
 - Нужны связанные данные (используйте Hash)
 - Нужны дубликаты (используйте List)
 
-## Реализация дополнительных операций (примеры)
+## Практические примеры использования дополнительных операций
 
-Если нужно использовать операции, которых нет в нашем сервисе, можно использовать прямой доступ к клиенту:
+### Пример 1: Поиск статей с несколькими тегами
 
 ```typescript
-// Получить количество элементов
-async scard(key: string): Promise<number> {
-  return this.redisClient.scard(key);
-}
+// Статьи с разными тегами
+await redis.sadd('tag:tech:articles', 'article:1', 'article:2', 'article:3');
+await redis.sadd('tag:programming:articles', 'article:2', 'article:3', 'article:4');
+await redis.sadd('tag:redis:articles', 'article:1', 'article:3', 'article:5');
 
-// Получить случайный элемент
-async spop(key: string): Promise<string | null> {
-  return this.redisClient.spop(key);
-}
+// Найти статьи, которые имеют ВСЕ три тега (пересечение)
+const articlesWithAllTags = await redis.sinter(
+  'tag:tech:articles',
+  'tag:programming:articles',
+  'tag:redis:articles'
+);
+console.log(articlesWithAllTags); // ['article:3'] - только эта статья имеет все три тега
 
-// Объединение множеств
-async sunion(...keys: string[]): Promise<string[]> {
-  return this.redisClient.sunion(...keys);
-}
+// Найти статьи с любым из тегов (объединение)
+const articlesWithAnyTag = await redis.sunion(
+  'tag:tech:articles',
+  'tag:programming:articles',
+  'tag:redis:articles'
+);
+console.log(articlesWithAnyTag); // Все уникальные статьи
+```
 
-// Пересечение множеств
-async sinter(...keys: string[]): Promise<string[]> {
-  return this.redisClient.sinter(...keys);
-}
+### Пример 2: Лотерея с призами
+
+```typescript
+// Создаем множество призов
+await redis.sadd('prizes', 'car', 'bike', 'phone', 'watch', 'book');
+
+// Разыгрываем призы (удаляем из множества)
+const prize1 = await redis.spop('prizes'); // Например: 'car'
+const prize2 = await redis.spop('prizes'); // Например: 'bike'
+
+// Проверяем оставшиеся призы
+const remaining = await redis.scard('prizes');
+console.log(`Осталось призов: ${remaining}`); // 3
+
+// Показываем случайный приз без удаления (для предпросмотра)
+const preview = await redis.srandmember('prizes');
+console.log(`Следующий приз может быть: ${preview}`);
+```
+
+### Пример 3: Управление подписками пользователей
+
+```typescript
+// Пользователь подписан на категории
+await redis.sadd('user:1:subscriptions', 'tech', 'sports', 'music');
+await redis.sadd('user:2:subscriptions', 'tech', 'news', 'music');
+await redis.sadd('user:3:subscriptions', 'sports', 'news');
+
+// Найти общие интересы пользователей (пересечение)
+const commonInterests = await redis.sinter(
+  'user:1:subscriptions',
+  'user:2:subscriptions'
+);
+console.log(commonInterests); // ['tech', 'music']
+
+// Найти уникальные подписки пользователя 1 (разность)
+const uniqueToUser1 = await redis.sdiff(
+  'user:1:subscriptions',
+  'user:2:subscriptions'
+);
+console.log(uniqueToUser1); // ['sports'] - только у пользователя 1
+
+// Переместить подписку из активных в архив
+await redis.smove('user:1:subscriptions', 'user:1:archived', 'sports');
+```
+
+### Пример 4: Система рекомендаций
+
+```typescript
+// Теги, которые нравятся пользователю
+await redis.sadd('user:1:likes', 'action', 'comedy', 'drama');
+await redis.sadd('user:2:likes', 'comedy', 'drama', 'romance');
+await redis.sadd('user:3:likes', 'action', 'horror', 'thriller');
+
+// Найти пользователей с похожими вкусами
+const similarToUser1 = await redis.sinter('user:1:likes', 'user:2:likes');
+console.log(similarToUser1); // ['comedy', 'drama'] - общие предпочтения
+
+// Найти уникальные предпочтения для рекомендаций
+const uniqueLikes = await redis.sdiff('user:2:likes', 'user:1:likes');
+console.log(uniqueLikes); // ['romance'] - можно рекомендовать пользователю 1
+```
+
+### Пример 5: Управление доступом
+
+```typescript
+// Роли пользователей
+await redis.sadd('role:admin:permissions', 'read', 'write', 'delete', 'manage');
+await redis.sadd('role:user:permissions', 'read', 'write');
+await redis.sadd('role:guest:permissions', 'read');
+
+// Найти все разрешения (объединение)
+const allPermissions = await redis.sunion(
+  'role:admin:permissions',
+  'role:user:permissions',
+  'role:guest:permissions'
+);
+console.log(allPermissions); // Все уникальные разрешения
+
+// Найти разрешения, доступные только админу (разность)
+const adminOnly = await redis.sdiff(
+  'role:admin:permissions',
+  'role:user:permissions',
+  'role:guest:permissions'
+);
+console.log(adminOnly); // ['delete', 'manage'] - только для админа
+
+// Переместить пользователя из одной роли в другую
+await redis.smove('role:user:users', 'role:admin:users', 'user:123');
 ```
 
 ## Итог

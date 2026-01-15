@@ -279,6 +279,75 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return this.redisClient.sismember(key, member);
   }
 
+  /**
+   * Получить количество элементов в множестве
+   * @param key - Имя ключа множества
+   * @returns Количество элементов в множестве, 0 - если множество не существует или пусто
+   */
+  async scard(key: string): Promise<number> {
+    return this.redisClient.scard(key);
+  }
+
+  /**
+   * Получить и удалить случайный элемент из множества
+   * @param key - Имя ключа множества
+   * @returns Случайный элемент или null, если множество пусто
+   */
+  async spop(key: string): Promise<string | null> {
+    return this.redisClient.spop(key);
+  }
+
+  /**
+   * Получить один или несколько случайных элементов из множества (без удаления)
+   * @param key - Имя ключа множества
+   * @param count - Опционально: количество элементов для получения (по умолчанию 1)
+   * @returns Случайный элемент (строка) или массив элементов, или null если множество пусто
+   */
+  async srandmember(key: string, count?: number): Promise<string | string[] | null> {
+    if (count !== undefined) {
+      return this.redisClient.srandmember(key, count);
+    }
+    return this.redisClient.srandmember(key);
+  }
+
+  /**
+   * Переместить элемент из одного множества в другое (атомарная операция)
+   * @param source - Имя исходного множества
+   * @param destination - Имя целевого множества
+   * @param member - Элемент для перемещения
+   * @returns 1, если элемент перемещен, 0 - если элемент не существует в исходном множестве
+   */
+  async smove(source: string, destination: string, member: string): Promise<number> {
+    return this.redisClient.smove(source, destination, member);
+  }
+
+  /**
+   * Объединить несколько множеств и вернуть результат
+   * @param keys - Имена множеств для объединения (можно передать несколько)
+   * @returns Массив всех уникальных элементов из всех множеств
+   */
+  async sunion(...keys: string[]): Promise<string[]> {
+    return this.redisClient.sunion(...keys);
+  }
+
+  /**
+   * Найти пересечение нескольких множеств (общие элементы)
+   * @param keys - Имена множеств для пересечения (можно передать несколько)
+   * @returns Массив элементов, которые присутствуют во всех множествах
+   */
+  async sinter(...keys: string[]): Promise<string[]> {
+    return this.redisClient.sinter(...keys);
+  }
+
+  /**
+   * Найти разность множеств (элементы из первого множества, которых нет в остальных)
+   * @param keys - Имена множеств (первое - источник, остальные - для вычитания)
+   * @returns Массив элементов из первого множества, которых нет в остальных
+   */
+  async sdiff(...keys: string[]): Promise<string[]> {
+    return this.redisClient.sdiff(...keys);
+  }
+
   // Sorted Set operations
 
   /**
